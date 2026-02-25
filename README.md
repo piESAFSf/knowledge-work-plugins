@@ -1,74 +1,86 @@
-# Knowledge Work Plugins
+# Enterprise Multi-tenant SaaS Scaffold
 
-Plugins that turn Claude into a specialist for your role, team, and company. Built for [Claude Cowork](https://claude.com/product/cowork), also compatible with [Claude Code](https://claude.com/product/claude-code).
+## 1) 專案目錄樹
 
-## Why Plugins
+```text
+backend/
+  app/
+    api/
+    core/
+    models/
+    schemas/
+    services/
+    tasks/
+    main.py
+  alembic/
+  tests/
+  requirements.txt
+  Dockerfile
+frontend/
+  src/
+    pages/
+    components/
+    api/
+    main.tsx
+  package.json
+  vite.config.ts
+  Dockerfile
+nginx/
+  default.conf
+docker-compose.yml
+.env.example
+README.md
+```
 
-Cowork lets you set the goal and Claude delivers finished, professional work. Plugins let you go further: tell Claude how you like work done, which tools and data to pull from, how to handle critical workflows, and what slash commands to expose — so your team gets better and more consistent outcomes.
+## 2) 核心能力
+- FastAPI + SQLAlchemy + Alembic
+- JWT (access + refresh) with HttpOnly cookie
+- Multi-tenant company data isolation (`company_id`)
+- RBAC (`owner/manager/staff`)
+- Stripe webhook subscription sync
+- LINE webhook + OpenAI summarization service layer
+- Redis cache/broker + Celery worker
+- React + Vite + TypeScript + Tailwind dashboard skeleton
 
-Each plugin bundles the skills, connectors, slash commands, and sub-agents for a specific job function. Out of the box, they give Claude a strong starting point for helping anyone in that role. The real power comes when you customize them for your company — your tools, your terminology, your processes — so Claude works like it was built for your team.
-
-## Plugin Marketplace
-
-We're open-sourcing 11 plugins built and inspired by our own work:
-
-| Plugin | How it helps | Connectors |
-|--------|-------------|------------|
-| **[productivity](./productivity)** | Manage tasks, calendars, daily workflows, and personal context so you spend less time repeating yourself. | Slack, Notion, Asana, Linear, Jira, Monday, ClickUp, Microsoft 365 |
-| **[sales](./sales)** | Research prospects, prep for calls, review your pipeline, draft outreach, and build competitive battlecards. | Slack, HubSpot, Close, Clay, ZoomInfo, Notion, Jira, Fireflies, Microsoft 365 |
-| **[customer-support](./customer-support)** | Triage tickets, draft responses, package escalations, research customer context, and turn resolved issues into knowledge base articles. | Slack, Intercom, HubSpot, Guru, Jira, Notion, Microsoft 365 |
-| **[product-management](./product-management)** | Write specs, plan roadmaps, synthesize user research, keep stakeholders updated, and track the competitive landscape. | Slack, Linear, Asana, Monday, ClickUp, Jira, Notion, Figma, Amplitude, Pendo, Intercom, Fireflies |
-| **[marketing](./marketing)** | Draft content, plan campaigns, enforce brand voice, brief on competitors, and report on performance across channels. | Slack, Canva, Figma, HubSpot, Amplitude, Notion, Ahrefs, SimilarWeb, Klaviyo |
-| **[legal](./legal)** | Review contracts, triage NDAs, navigate compliance, assess risk, prep for meetings, and draft templated responses. | Slack, Box, Egnyte, Jira, Microsoft 365 |
-| **[finance](./finance)** | Prep journal entries, reconcile accounts, generate financial statements, analyze variances, manage close, and support audits. | Snowflake, Databricks, BigQuery, Slack, Microsoft 365 |
-| **[data](./data)** | Query, visualize, and interpret datasets — write SQL, run statistical analysis, build dashboards, and validate your work before sharing. | Snowflake, Databricks, BigQuery, Hex, Amplitude, Jira |
-| **[enterprise-search](./enterprise-search)** | Find anything across email, chat, docs, and wikis — one query across all your company's tools. | Slack, Notion, Guru, Jira, Asana, Microsoft 365 |
-| **[bio-research](./bio-research)** | Connect to preclinical research tools and databases (literature search, genomics analysis, target prioritization) to accelerate early-stage life sciences R&D. | PubMed, BioRender, bioRxiv, ClinicalTrials.gov, ChEMBL, Synapse, Wiley, Owkin, Open Targets, Benchling |
-| **[cowork-plugin-management](./cowork-plugin-management)** | Create new plugins or customize existing ones for your organization's specific tools and workflows. | — |
-
-Install these directly from Cowork, browse the full collection here on GitHub, or build your own.
-
-## Getting Started
-
+## 3) Docker 執行方式
 ```bash
-# Install from the plugin marketplace
-claude plugins add knowledge-work-plugins
-
-# Or install a specific plugin
-claude plugins add knowledge-work-plugins/sales
+cp .env.example .env
+docker compose up --build
 ```
 
-Once installed, plugins activate automatically. Skills fire when relevant, and slash commands are available in your session (e.g., `/sales:call-prep`, `/data:write-query`).
+服務入口:
+- App: http://localhost
+- OpenAPI: http://localhost/docs
 
-## How Plugins Work
+## 4) 本地開發啟動步驟
 
-Every plugin follows the same structure:
-
+### Backend
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
 ```
-plugin-name/
-├── .claude-plugin/plugin.json   # Manifest
-├── .mcp.json                    # Tool connections
-├── commands/                    # Slash commands you invoke explicitly
-└── skills/                      # Domain knowledge Claude draws on automatically
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-- **Skills** encode the domain expertise, best practices, and step-by-step workflows Claude needs to give you useful help. Claude draws on them automatically when relevant.
-- **Commands** are explicit actions you trigger (e.g., `/finance:reconciliation`, `/product-management:write-spec`).
-- **Connectors** wire Claude to the external tools your role depends on — CRMs, project trackers, data warehouses, design tools, and more — via [MCP servers](https://modelcontextprotocol.io/).
+## 5) 生產環境部署說明
+1. 使用安全的 `SECRET_KEY` 與雲端 PostgreSQL/Redis。
+2. 將 `backend` 部署到容器平台（ECS/GKE/K8s），指令:
+   `gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 app.main:app`
+3. `worker` 獨立部署 Celery，監控 queue 與重試策略。
+4. Nginx/ALB 終止 TLS，僅暴露 443，後端內網通訊。
+5. 設定 Stripe 與 LINE webhook URL 指向 `/api/v1/webhooks/*`。
+6. 啟用監控（Prometheus/Grafana/Sentry）與每日資料備份。
 
-Every component is file-based — markdown and JSON, no code, no infrastructure, no build steps.
-
-## Making Them Yours
-
-These plugins are generic starting points. They become much more useful when you customize them for how your company actually works:
-
-- **Swap connectors** — Edit `.mcp.json` to point at your specific tool stack.
-- **Add company context** — Drop your terminology, org structure, and processes into skill files so Claude understands your world.
-- **Adjust workflows** — Modify skill instructions to match how your team actually does things, not how a textbook says to.
-- **Build new plugins** — Use the `cowork-plugin-management` plugin or follow the structure above to create plugins for roles and workflows we haven't covered yet.
-
-As your team builds and shares plugins, Claude becomes a cross-functional expert. The context you define gets baked into every relevant interaction, so leaders and admins can spend less time enforcing processes and more time improving them.
-
-## Contributing
-
-Plugins are just markdown files. Fork the repo, make your changes, and submit a PR.
+## 測試
+```bash
+cd backend
+pytest
+```
