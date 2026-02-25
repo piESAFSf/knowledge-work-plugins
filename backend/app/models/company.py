@@ -9,6 +9,7 @@ class Company(BaseModel):
 
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    line_user_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     subscription_plan: Mapped[str] = mapped_column(String(50), default='free')
     monthly_quota: Mapped[int] = mapped_column(Integer, default=1000)
     used_quota: Mapped[int] = mapped_column(Integer, default=0)

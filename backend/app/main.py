@@ -8,12 +8,14 @@ from starlette.responses import JSONResponse
 
 from app.api import auth, dashboard, users, webhooks
 from app.core.config import settings
+from app.middleware import SecurityHeadersMiddleware
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title=settings.app_name, version='1.0.0')
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, lambda request, exc: JSONResponse(status_code=429, content={'detail': 'Rate limit exceeded'}))
 app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,14 +29,17 @@ app.add_middleware(
 @app.middleware('http')
 async def csrf_middleware(request: Request, call_next):
     unsafe = {'POST', 'PUT', 'PATCH', 'DELETE'}
-    if request.method in unsafe and not request.url.path.startswith('/webhooks'):
+    path = request.url.path
+    webhook_paths = ('/webhooks', '/api/v1/webhooks')
+    is_webhook_request = any(path.startswith(prefix) for prefix in webhook_paths)
+    if request.method in unsafe and not is_webhook_request:
         csrf_cookie = request.cookies.get('csrf_token')
         csrf_header = request.headers.get('X-CSRF-Token')
         if not csrf_cookie or csrf_cookie != csrf_header:
             return JSONResponse(status_code=403, content={'detail': 'CSRF validation failed'})
     response = await call_next(request)
     if not request.cookies.get('csrf_token'):
-        response.set_cookie('csrf_token', 'csrf-dev-token', httponly=False, samesite='lax')
+        response.set_cookie('csrf_token', 'csrf-dev-token', httponly=False, samesite='lax', secure=settings.csrf_cookie_secure)
     return response
 
 

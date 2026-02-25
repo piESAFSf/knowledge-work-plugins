@@ -1,10 +1,10 @@
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import User
+from app.models import ApiKey, User
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -31,3 +31,13 @@ def require_roles(*roles: str):
         return user
 
     return checker
+
+
+def require_api_key(
+    x_api_key: str = Header(...),
+    db: Session = Depends(get_db),
+):
+    key = db.query(ApiKey).filter(ApiKey.key == x_api_key, ApiKey.is_active.is_(True)).first()
+    if not key:
+        raise HTTPException(status_code=401, detail='Invalid API key')
+    return key.company_id

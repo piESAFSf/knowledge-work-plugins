@@ -41,8 +41,10 @@ async def line_webhook(request: Request, db: Session = Depends(get_db), x_line_s
     data = await request.json()
     for event in data.get('events', []):
         text = event.get('message', {}).get('text', '')
-        company_id = event.get('source', {}).get('userId')
-        company = db.query(Company).filter(Company.id == company_id).first()
+        line_user_id = event.get('source', {}).get('userId')
+        if not line_user_id:
+            continue
+        company = db.query(Company).filter(Company.line_user_id == line_user_id).first()
         if not company:
             continue
         if company.used_quota >= company.monthly_quota:

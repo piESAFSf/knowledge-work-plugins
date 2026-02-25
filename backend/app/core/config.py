@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = 'HS256'
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 14
+    session_cookie_secure: bool = True
+    csrf_cookie_secure: bool = True
 
     database_url: str = 'postgresql+psycopg2://postgres:postgres@db:5432/saas'
     redis_url: str = 'redis://redis:6379/0'
