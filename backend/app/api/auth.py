@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -59,10 +59,10 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
 
 
 @router.post('/refresh', response_model=TokenResponse)
-def refresh(payload: RefreshRequest, response: Response, db: Session = Depends(get_db)):
+def refresh(payload: RefreshRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     from jose import jwt
 
-    token = payload.refresh_token or response.headers.get('x-refresh-token')
+    token = payload.refresh_token or request.headers.get('x-refresh-token') or request.cookies.get('refresh_token')
     if not token:
         raise HTTPException(status_code=401, detail='Missing refresh token')
     data = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])

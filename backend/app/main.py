@@ -27,7 +27,10 @@ app.add_middleware(
 @app.middleware('http')
 async def csrf_middleware(request: Request, call_next):
     unsafe = {'POST', 'PUT', 'PATCH', 'DELETE'}
-    if request.method in unsafe and not request.url.path.startswith('/webhooks'):
+    path = request.url.path
+    webhook_paths = ('/webhooks', '/api/v1/webhooks')
+    is_webhook_request = any(path.startswith(prefix) for prefix in webhook_paths)
+    if request.method in unsafe and not is_webhook_request:
         csrf_cookie = request.cookies.get('csrf_token')
         csrf_header = request.headers.get('X-CSRF-Token')
         if not csrf_cookie or csrf_cookie != csrf_header:
